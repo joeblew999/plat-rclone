@@ -10,6 +10,10 @@ Cross-platform GUI for [rclone](https://rclone.org) using Datastar + Gio.
 |------|-------|
 | ![Jobs](docs/jobs-view.png) | ![Stats](docs/stats-view.png) |
 
+### iOS (iPhone 16 Pro)
+
+<img src="docs/ios-remotes.png" width="300" alt="iOS App">
+
 ## Features
 
 - **Cross-platform** - macOS, iOS, Android, Windows from single codebase
