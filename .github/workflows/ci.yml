@@ -59,20 +59,26 @@ jobs:
       - name: Install tools
         run: xplat task setup
 
-      - name: Build web binaries
-        shell: bash
+      - name: Build (Linux)
+        if: matrix.platform == 'linux'
         run: |
-          xplat task templ
-          SUFFIX="${{ matrix.platform == 'windows' && '.exe' || '' }}"
-          ARCH="${{ runner.arch == 'X64' && 'amd64' || 'arm64' }}"
-          go build -o "plat-rclone-${{ matrix.platform }}-${ARCH}${SUFFIX}" ./cmd/plat-rclone
-          go build -tags=rclone_full -o "plat-rclone-full-${{ matrix.platform }}-${ARCH}${SUFFIX}" ./cmd/plat-rclone
+          xplat task build
+          xplat task build-full
+          mv .bin/plat-rclone-web plat-rclone-linux-amd64
+          mv .bin/plat-rclone-web-full plat-rclone-full-linux-amd64
 
-      - name: Build macOS app
+      - name: Build (macOS)
         if: matrix.platform == 'macos'
         run: |
-          goup-util build macos .
+          xplat task macos
           zip -r plat-rclone-macos-app.zip .bin/*.app
+
+      - name: Build (Windows)
+        if: matrix.platform == 'windows'
+        shell: bash
+        run: |
+          xplat task windows
+          cp .bin/*.exe plat-rclone-windows-amd64.exe
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
