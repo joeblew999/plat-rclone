@@ -155,25 +155,30 @@ tasks:
   # === Setup ===
 
   tools:
-    desc: Install all required tools (idempotent)
+    desc: Install all required tools (idempotent, cross-platform)
     deps: [tools:templ, tools:goup]
 
   tools:templ:
     desc: Install templ
     internal: true
     status:
-      - which templ
+      - xplat os which templ
     cmds:
       - go install github.com/a-h/templ/cmd/templ@latest
 
   tools:goup:
     desc: Install goup-util
     internal: true
-    platforms: [linux, darwin]
+    vars:
+      EXT: '{{if eq OS "windows"}}.exe{{end}}'
+      BIN: '{{if eq OS "windows"}}{{.USERPROFILE}}/go/bin{{else}}/usr/local/bin{{end}}'
     status:
-      - which goup-util
+      - xplat os which goup-util
     cmds:
-      - 'curl -fsSL "https://github.com/joeblew999/goup-util/releases/download/{{.GOUP_VERSION}}/goup-util_$(uname -s)_$(uname -m).tar.gz" | tar -xz -C /usr/local/bin goup-util'
+      - xplat os mkdir {{.BIN}}
+      - xplat os fetch -o {{.BIN}} "https://github.com/joeblew999/goup-util/releases/download/{{.GOUP_VERSION}}/goup-util-{{OS}}-{{ARCH}}{{.EXT}}"
+      - xplat os mv {{.BIN}}/goup-util-{{OS}}-{{ARCH}}{{.EXT}} {{.BIN}}/goup-util{{.EXT}}
+      - '{{if ne OS "windows"}}chmod +x {{.BIN}}/goup-util{{end}}'
 
   # === Quality ===
 

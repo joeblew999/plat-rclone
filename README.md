@@ -94,8 +94,36 @@ xplat task all        # All platforms
 
 Releases are automated via GitHub Actions using [xplat](https://github.com/joeblew999/xplat).
 
+### Why xplat? DRY Build Automation
+
+xplat eliminates duplication between local development and CI:
+
+| Traditional Approach | xplat Approach |
+|---------------------|----------------|
+| Makefile for local, bash scripts for CI | Single `Taskfile.yml` everywhere |
+| Platform-specific commands (`curl`, `uname`) | `xplat os` cross-platform utils |
+| Manual tool version tracking | Idempotent installs with checksums |
+| Different logic in CI vs local | Same `xplat task` commands |
+
+```yaml
+# Taskfile.yml - works identically on macOS, Linux, Windows, and CI
+tools:
+  status: [xplat os which templ]        # Skip if already installed
+  cmds:   [go install ...templ@latest]  # Idempotent
+```
+
+```yaml
+# CI just calls the same tasks
+- run: xplat task tools   # Idempotent - skips if tools exist
+- run: xplat task build
+- run: xplat task test
+```
+
+No shell-specific code, no platform conditionals, no duplicated logic.
+
+### Creating a Release
+
 ```bash
-# Create a release
 git tag v1.0.0
 git push origin v1.0.0
 # GitHub Actions builds all platforms automatically
@@ -158,15 +186,14 @@ make test                   # Run tests
 
 - Go 1.24+
 - [xplat](https://github.com/joeblew999/xplat) - Build orchestration
-- [goup-util](https://github.com/joeblew999/goup-util) - Cross-platform builds
-- [templ](https://github.com/a-h/templ) - HTML templates
 
 ```bash
-# Install all tools
+# Install xplat, then all tools (templ, goup-util) in one command
 curl -fsSL https://raw.githubusercontent.com/joeblew999/xplat/main/install.sh | sh
-xplat task tools
-xplat task install-goup
+xplat task tools    # Installs templ + goup-util (idempotent)
 ```
+
+Tools are installed idempotently - running `xplat task tools` multiple times is safe and fast.
 
 ## References
 
