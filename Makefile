@@ -70,8 +70,8 @@ datastar:  # Download Datastar JS bundles (must match Go SDK version)
 icons:  # Generate app icons from icon-source.png
 	@$(GOUP) icons .
 
-screenshot:  # Take iOS simulator screenshot (requires goup-util with CGO)
-	@xcrun simctl io booted screenshot docs/ios-screenshot.png
+screenshot:  # Take iOS simulator screenshot (goup-util needs CGO build)
+	@$(GOUP) screenshot docs/ios-screenshot.png || xcrun simctl io booted screenshot docs/ios-screenshot.png
 	@echo "Screenshot saved to docs/ios-screenshot.png"
 
 clean:  # Remove build outputs
