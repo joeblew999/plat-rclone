@@ -152,15 +152,19 @@ tasks:
       - task: macos
       - task: build
       - task: build-full
+      - task: debug
       # Zip app bundle - goup-util outputs to .bin/macos/ on CI, .bin/ locally
       - |
         if [ -d .bin/macos ]; then
-          cd .bin/macos && zip -r ../../.dist/{{.BINARY}}-macos.zip *.app
+          echo "Using .bin/macos path"
+          zip -r .dist/{{.BINARY}}-macos.zip .bin/macos/*.app
         else
-          cd .bin && zip -r ../.dist/{{.BINARY}}-macos.zip *.app
+          echo "Using .bin path"
+          zip -r .dist/{{.BINARY}}-macos.zip .bin/*.app
         fi
       - cp .bin/{{.BINARY}}-web .dist/{{.BINARY}}-macos-amd64
       - cp .bin/{{.BINARY}}-web-full .dist/{{.BINARY}}-full-macos-amd64
+      - echo "=== .dist contents ===" && ls -la .dist/
 
   release:linux:
     desc: Build Linux release (web binaries only, no GUI)
@@ -169,8 +173,10 @@ tasks:
       - mkdir -p .dist
       - task: build
       - task: build-full
+      - task: debug
       - cp .bin/{{.BINARY}}-web .dist/{{.BINARY}}-linux-amd64
       - cp .bin/{{.BINARY}}-web-full .dist/{{.BINARY}}-full-linux-amd64
+      - echo "=== .dist contents ===" && ls -la .dist/
 
   release:windows:
     desc: Build Windows release (web binaries only)
@@ -179,6 +185,7 @@ tasks:
       - mkdir -p .dist
       - go build -o .dist/{{.BINARY}}-windows-amd64.exe ./cmd/plat-rclone
       - go build -tags=rclone_full -o .dist/{{.BINARY}}-full-windows-amd64.exe ./cmd/plat-rclone
+      - echo "=== .dist contents ===" && ls -la .dist/ || dir .dist\
 
   # === Utils ===
 
