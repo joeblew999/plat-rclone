@@ -47,7 +47,7 @@ make dev                           # Run web server (http://localhost:8080)
 
 ## goup-util Integration
 
-This project uses [goup-util](https://github.com/joeblew999/goup-util) for cross-platform builds with zero configuration.
+This project uses [goup-util v2.0.0](https://github.com/joeblew999/goup-util/releases/tag/v2.0.0) for cross-platform builds with zero configuration.
 
 ### Build Commands
 
