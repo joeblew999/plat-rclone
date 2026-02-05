@@ -1,116 +1,123 @@
-.PHONY: all clean templ macos ios android windows web run-macos ios-sim run-web dev download datastar icons tools test fmt help screenshot install-goup
+.PHONY: all clean templ macos ios android windows web run-macos ios-sim run-web dev dev-embedded dev-embedded-full download datastar icons tools test fmt help screenshot install-goup
 
-# Datastar JS version (must match Go SDK)
+# Versions
 DATASTAR_VERSION := v1.0.0-RC.7
-
-# goup-util for cross-platform builds
 GOUP := goup-util
 GOUP_VERSION := v2.0.0
 
-# Build all platforms
+# === Build ===
+
 all: templ macos ios android windows web
 
-# Generate templ files
 templ:
 	@templ generate
 
-# === Platform Builds ===
-# Uses goup-util to build native Gio apps with embedded webview
-# Output: .bin/plat-rclone.{app,apk,exe}
-
-macos: templ  # Build macOS .app bundle
+# Native apps (Gio + webview) via goup-util
+macos: templ
 	@$(GOUP) build macos .
 
-ios: templ  # Build iOS .app for device/simulator
+ios: templ
 	@$(GOUP) build ios .
 
-android: templ  # Build Android .apk
+android: templ
 	@$(GOUP) build android .
 
-windows: templ  # Build Windows .exe with embedded icon
+windows: templ
 	@$(GOUP) build windows .
+
+# Web server binary
+web: templ
+	@go build -o .bin/plat-rclone-web ./cmd/plat-rclone
+
+web-full: templ  # Web server with all rclone backends
+	@go build -tags=rclone_full -o .bin/plat-rclone-web ./cmd/plat-rclone
 
 # === Run ===
 
 run-macos: macos
 	@open .bin/*.app
 
+run-web: web
+	@.bin/plat-rclone-web serve
+
 ios-sim: ios
 	@xcrun simctl install booted .bin/*.app
 	@xcrun simctl launch booted com.github.plat_rclone
 
-# === Web Server ===
-# Headless mode - serve via HTTP for browsers (no native UI)
-
-web: templ  # Build standalone web server binary
-	@go build -o .bin/plat-rclone-web ./cmd/plat-rclone
-
-run-web: web  # Run web server on http://localhost:8080
-	@.bin/plat-rclone-web serve
-
-dev: templ  # Development mode with hot reload (go run)
+# Development modes
+dev: templ  # HTTP mode - requires: rclone rcd --rc-no-auth
 	@go run ./cmd/plat-rclone serve
+
+dev-embedded: templ  # Embedded rclone - local backend only (fast build)
+	@go run ./cmd/plat-rclone serve -embedded
+
+dev-embedded-full: templ  # Embedded rclone - all backends (slow build, large binary)
+	@go run -tags=rclone_full ./cmd/plat-rclone serve -embedded
 
 # === Utils ===
 
-download:  # Download rclone binary for current platform
+download:
 	@go run ./cmd/plat-rclone download .bin
 
-datastar:  # Download Datastar JS bundles (must match Go SDK version)
+datastar:
 	@mkdir -p static/js
-	@echo "Downloading Datastar $(DATASTAR_VERSION) bundles..."
+	@echo "Downloading Datastar $(DATASTAR_VERSION)..."
 	@curl -sL "https://raw.githubusercontent.com/starfederation/datastar/$(DATASTAR_VERSION)/bundles/datastar.js" -o static/js/datastar.js
 	@curl -sL "https://raw.githubusercontent.com/starfederation/datastar/$(DATASTAR_VERSION)/bundles/datastar.js.map" -o static/js/datastar.js.map
 	@curl -sL "https://raw.githubusercontent.com/starfederation/datastar/$(DATASTAR_VERSION)/bundles/datastar-core.js" -o static/js/datastar-core.js
 	@curl -sL "https://raw.githubusercontent.com/starfederation/datastar/$(DATASTAR_VERSION)/bundles/datastar-core.js.map" -o static/js/datastar-core.js.map
-	@curl -sL "https://raw.githubusercontent.com/starfederation/datastar/$(DATASTAR_VERSION)/bundles/datastar-aliased.js" -o static/js/datastar-aliased.js
-	@curl -sL "https://raw.githubusercontent.com/starfederation/datastar/$(DATASTAR_VERSION)/bundles/datastar-aliased.js.map" -o static/js/datastar-aliased.js.map
-	@echo "Downloaded all bundles:"
-	@ls -lh static/js/datastar*.js
+	@echo "Done: static/js/datastar*.js"
 
-icons:  # Generate app icons from icon-source.png
+icons:
 	@$(GOUP) icons .
 
-screenshot:  # Take iOS simulator screenshot
+screenshot:
 	@xcrun simctl io booted screenshot docs/ios-screenshot.png
-	@echo "Screenshot saved to docs/ios-screenshot.png"
+	@echo "Saved: docs/ios-screenshot.png"
 
-clean:  # Remove build outputs
+clean:
 	@rm -rf .bin .build
 	@echo "Cleaned"
 
-tools:  # Install required Go tools
+# === Setup ===
+
+tools:
 	@go install github.com/a-h/templ/cmd/templ@latest
 
-install-goup:  # Install goup-util $(GOUP_VERSION) for cross-platform builds
+install-goup:
 	@echo "Installing goup-util $(GOUP_VERSION)..."
 	@curl -fsSL "https://github.com/joeblew999/goup-util/releases/download/$(GOUP_VERSION)/goup-util_$(shell uname -s)_$(shell uname -m).tar.gz" | tar -xz -C /usr/local/bin goup-util
-	@echo "Installed goup-util $(GOUP_VERSION) to /usr/local/bin"
+	@echo "Installed: /usr/local/bin/goup-util"
 	@goup-util --help | head -1
 
-test:  # Run all tests
+test:
 	@go test ./...
 
-fmt:  # Format Go and templ files
+fmt:
 	@go fmt ./...
 	@templ fmt templates/
 
 # === Help ===
 
-help:  # Show this help
+help:
 	@echo "plat-rclone - Cross-platform GUI for rclone"
 	@echo ""
-	@echo "Build:                              Run:"
-	@echo "  make all       All platforms        make run-macos  Run macOS app"
-	@echo "  make macos     macOS .app           make run-web    Web :8080"
-	@echo "  make ios       iOS .app             make dev        Dev mode"
-	@echo "  make android   Android .apk         make ios-sim    iOS simulator"
-	@echo "  make windows   Windows .exe"
-	@echo "  make web       Web server"
+	@echo "Development:"
+	@echo "  make dev               HTTP mode (needs: rclone rcd --rc-no-auth)"
+	@echo "  make dev-embedded      Embedded mode, local backend only (fast)"
+	@echo "  make dev-embedded-full Embedded mode, all backends (slow, ~100MB)"
 	@echo ""
-	@echo "Utils:                              Setup:"
-	@echo "  make download  Get rclone binary    make install-goup  Install goup-util"
-	@echo "  make datastar  Update Datastar JS   make tools         Install templ"
-	@echo "  make icons     Generate app icons   make clean         Remove build files"
+	@echo "Build:                   Run:"
+	@echo "  make all               make run-macos    Run macOS app"
+	@echo "  make macos             make run-web      Web server :8080"
+	@echo "  make ios               make ios-sim      iOS simulator"
+	@echo "  make android"
+	@echo "  make windows"
+	@echo "  make web               make web-full     With all backends"
 	@echo ""
-	@echo "Versions: goup-util $(GOUP_VERSION) | Datastar JS $(DATASTAR_VERSION)"
+	@echo "Setup:                   Utils:"
+	@echo "  make tools             make download     Get rclone binary"
+	@echo "  make install-goup      make datastar     Update JS bundles"
+	@echo "  make clean             make icons        Generate app icons"
+	@echo ""
+	@echo "Versions: goup-util $(GOUP_VERSION) | Datastar $(DATASTAR_VERSION)"
