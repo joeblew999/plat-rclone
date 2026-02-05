@@ -8,6 +8,21 @@ vars:
   BINARY: plat-rclone
 
 tasks:
+  # === Debug ===
+
+  debug:
+    desc: Show environment info (for CI debugging)
+    cmds:
+      - echo "OS={{OS}} ARCH={{ARCH}}"
+      - echo "HOME={{.HOME}}"
+      - echo "PWD=$(pwd)"
+      - echo "--- .bin/ ---"
+      - ls -la .bin/ 2>/dev/null || echo ".bin/ not found"
+      - echo "--- .dist/ ---"
+      - ls -la .dist/ 2>/dev/null || echo ".dist/ not found"
+      - echo "--- PATH ---"
+      - echo "$PATH" | tr ':' '\n' | head -10
+
   # === Development ===
 
   default:
@@ -137,8 +152,13 @@ tasks:
       - task: macos
       - task: build
       - task: build-full
-      # Zip app bundle (handle both output locations)
-      - cd .bin && zip -r ../.dist/{{.BINARY}}-macos.zip *.app 2>/dev/null || cd macos && zip -r ../../.dist/{{.BINARY}}-macos.zip *.app
+      # Zip app bundle - goup-util outputs to .bin/macos/ on CI, .bin/ locally
+      - |
+        if [ -d .bin/macos ]; then
+          cd .bin/macos && zip -r ../../.dist/{{.BINARY}}-macos.zip *.app
+        else
+          cd .bin && zip -r ../.dist/{{.BINARY}}-macos.zip *.app
+        fi
       - cp .bin/{{.BINARY}}-web .dist/{{.BINARY}}-macos-amd64
       - cp .bin/{{.BINARY}}-web-full .dist/{{.BINARY}}-full-macos-amd64
 
