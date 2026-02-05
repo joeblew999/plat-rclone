@@ -133,29 +133,30 @@ tasks:
     desc: Build macOS release (app bundle + web binaries)
     deps: [templ]
     cmds:
-      - xplat os mkdir -p .dist
+      - mkdir -p .dist
       - task: macos
       - task: build
       - task: build-full
-      # Zip app bundle for distribution
-      - cd .bin && zip -r ../{{.BINARY}}-macos.zip *.app || cd macos && zip -r ../../.dist/{{.BINARY}}-macos.zip *.app
-      - xplat os mv {{.BINARY}}-macos.zip .dist/ 2>/dev/null || true
+      # Zip app bundle (handle both output locations)
+      - cd .bin && zip -r ../.dist/{{.BINARY}}-macos.zip *.app 2>/dev/null || cd macos && zip -r ../../.dist/{{.BINARY}}-macos.zip *.app
+      - cp .bin/{{.BINARY}}-web .dist/{{.BINARY}}-macos-amd64
+      - cp .bin/{{.BINARY}}-web-full .dist/{{.BINARY}}-full-macos-amd64
 
   release:linux:
     desc: Build Linux release (web binaries only, no GUI)
     deps: [templ]
     cmds:
-      - xplat os mkdir -p .dist
+      - mkdir -p .dist
       - task: build
       - task: build-full
-      - xplat os cp .bin/{{.BINARY}}-web .dist/{{.BINARY}}-linux-amd64
-      - xplat os cp .bin/{{.BINARY}}-web-full .dist/{{.BINARY}}-full-linux-amd64
+      - cp .bin/{{.BINARY}}-web .dist/{{.BINARY}}-linux-amd64
+      - cp .bin/{{.BINARY}}-web-full .dist/{{.BINARY}}-full-linux-amd64
 
   release:windows:
     desc: Build Windows release (web binaries only)
     deps: [templ]
     cmds:
-      - xplat os mkdir -p .dist
+      - mkdir -p .dist
       - go build -o .dist/{{.BINARY}}-windows-amd64.exe ./cmd/plat-rclone
       - go build -tags=rclone_full -o .dist/{{.BINARY}}-full-windows-amd64.exe ./cmd/plat-rclone
 
