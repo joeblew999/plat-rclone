@@ -1,4 +1,7 @@
-.PHONY: all clean templ macos ios android windows web run-macos ios-sim run-web dev download icons tools test fmt help
+.PHONY: all clean templ macos ios android windows web run-macos ios-sim run-web dev download datastar icons tools test fmt help
+
+# Datastar JS version (must match Go SDK)
+DATASTAR_VERSION := v1.0.0-RC.7
 
 # goup-util for cross-platform builds
 GOUP := goup-util
@@ -49,6 +52,18 @@ dev: templ
 download:
 	@go run ./cmd/plat-rclone download .bin
 
+datastar:
+	@mkdir -p static/js
+	@echo "Downloading Datastar $(DATASTAR_VERSION) bundles..."
+	@curl -sL "https://raw.githubusercontent.com/starfederation/datastar/$(DATASTAR_VERSION)/bundles/datastar.js" -o static/js/datastar.js
+	@curl -sL "https://raw.githubusercontent.com/starfederation/datastar/$(DATASTAR_VERSION)/bundles/datastar.js.map" -o static/js/datastar.js.map
+	@curl -sL "https://raw.githubusercontent.com/starfederation/datastar/$(DATASTAR_VERSION)/bundles/datastar-core.js" -o static/js/datastar-core.js
+	@curl -sL "https://raw.githubusercontent.com/starfederation/datastar/$(DATASTAR_VERSION)/bundles/datastar-core.js.map" -o static/js/datastar-core.js.map
+	@curl -sL "https://raw.githubusercontent.com/starfederation/datastar/$(DATASTAR_VERSION)/bundles/datastar-aliased.js" -o static/js/datastar-aliased.js
+	@curl -sL "https://raw.githubusercontent.com/starfederation/datastar/$(DATASTAR_VERSION)/bundles/datastar-aliased.js.map" -o static/js/datastar-aliased.js.map
+	@echo "Downloaded all bundles:"
+	@ls -lh static/js/datastar*.js
+
 icons:
 	@$(GOUP) icons .
 
@@ -87,4 +102,5 @@ help:
 	@echo ""
 	@echo "Utils:"
 	@echo "  make download   Get rclone"
+	@echo "  make datastar   Update Datastar JS"
 	@echo "  make clean      Clean"

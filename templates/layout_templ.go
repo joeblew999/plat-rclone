@@ -42,7 +42,7 @@ func Layout(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - plat-rclone</title><script type=\"module\" src=\"https://cdn.jsdelivr.net/npm/@starfederation/datastar@1.0.0-RC.7/dist/datastar.min.js\"></script><link href=\"/static/css/style.css\" rel=\"stylesheet\"></head><body><nav class=\"navbar\"><a href=\"/\" class=\"logo\">plat-rclone</a><div class=\"nav-links\"><a href=\"/\">Remotes</a> <a href=\"/jobs\">Jobs</a> <a href=\"/stats\">Stats</a></div></nav><main class=\"container\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - plat-rclone</title><script type=\"module\" src=\"/static/js/datastar.js\"></script><link href=\"/static/css/style.css\" rel=\"stylesheet\"></head><body><nav class=\"navbar\"><a href=\"/\" class=\"logo\">plat-rclone</a><div class=\"nav-links\"><a href=\"/\">Remotes</a> <a href=\"/jobs\">Jobs</a> <a href=\"/stats\">Stats</a></div></nav><main class=\"container\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

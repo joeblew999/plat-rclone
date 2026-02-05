@@ -39,14 +39,15 @@ func (c *Client) WithAuth(username, password string) *Client {
 func (c *Client) Call(method string, params any) (json.RawMessage, error) {
 	url := c.BaseURL + "/" + method
 
-	var body io.Reader
-	if params != nil {
-		data, err := json.Marshal(params)
-		if err != nil {
-			return nil, fmt.Errorf("marshal params: %w", err)
-		}
-		body = bytes.NewReader(data)
+	// rclone RC API always expects JSON, even if empty
+	if params == nil {
+		params = map[string]any{}
 	}
+	data, err := json.Marshal(params)
+	if err != nil {
+		return nil, fmt.Errorf("marshal params: %w", err)
+	}
+	body := bytes.NewReader(data)
 
 	req, err := http.NewRequest("POST", url, body)
 	if err != nil {

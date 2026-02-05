@@ -50,11 +50,42 @@ plat-rclone/
 │   ├── rclone/         # RC API client
 │   └── router/         # Chi + Datastar
 ├── templates/          # templ templates
-├── static/             # CSS (embedded)
+├── static/             # CSS, JS (embedded)
 ├── icon-source.png     # App icon
 ├── Makefile
 ├── .bin/               # Build output
 └── .build/             # Intermediate
+```
+
+## Datastar Versions
+
+The Go SDK and JS library must be compatible:
+
+| Go SDK (datastar-go) | JS Library | Status |
+|---------------------|------------|--------|
+| v1.1.0 | v1.0.0-RC.7 | Current |
+
+Update JS library:
+```bash
+make datastar    # Downloads all bundles to static/js/
+```
+
+Available bundles:
+- `datastar.js` - Full bundle (30KB)
+- `datastar-core.js` - Core only (9KB)
+- `datastar-aliased.js` - Aliased exports
+
+## AI Debugging
+
+Since plat-rclone uses standard web technologies (HTML, CSS, JavaScript), AI tools can easily debug the UI using browser automation like Playwright:
+
+```bash
+make dev                         # Start dev server
+# AI can use Playwright MCP to:
+# - Take snapshots of the DOM
+# - Click buttons and test interactions
+# - Inspect network requests (SSE streams)
+# - Verify Datastar reactivity
 ```
 
 ## Requirements

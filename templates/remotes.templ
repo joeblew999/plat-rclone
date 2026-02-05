@@ -11,7 +11,7 @@ templ RemotesPage(remotes []RemoteInfo) {
 			<h1>Remotes</h1>
 			<button
 				class="btn btn-primary"
-				data-on-click="@get('/api/remotes/refresh')"
+				data-on:click="@get('/api/remotes/refresh')"
 			>
 				Refresh
 			</button>
@@ -46,13 +46,13 @@ templ RemoteCard(r RemoteInfo) {
 		<div class="card-actions">
 			<button
 				class="btn btn-sm"
-				data-on-click={ "@get('/api/remotes/" + r.Name + "/browse')" }
+				data-on:click={ "@get('/api/remotes/" + r.Name + "/browse')" }
 			>
 				Browse
 			</button>
 			<button
 				class="btn btn-sm btn-danger"
-				data-on-click={ "@delete('/api/remotes/" + r.Name + "')" }
+				data-on:click={ "@delete('/api/remotes/" + r.Name + "')" }
 			>
 				Delete
 			</button>
@@ -67,7 +67,7 @@ templ FileBrowser(remote string, path string, items []FileItem) {
 			if path != "" {
 				<button
 					class="btn btn-sm"
-					data-on-click={ "@get('/api/remotes/" + remote + "/browse?path=..')" }
+					data-on:click={ "@get('/api/remotes/" + remote + "/browse?path=..')" }
 				>
 					↑ Up
 				</button>
@@ -105,7 +105,7 @@ templ FileRow(remote, path string, item FileItem) {
 				<span class="icon">📁</span>
 				<a
 					href="#"
-					data-on-click={ "@get('/api/remotes/" + remote + "/browse?path=" + path + "/" + item.Name + "')" }
+					data-on:click={ "@get('/api/remotes/" + remote + "/browse?path=" + path + "/" + item.Name + "')" }
 				>
 					{ item.Name }
 				</a>
@@ -120,7 +120,7 @@ templ FileRow(remote, path string, item FileItem) {
 			if !item.IsDir {
 				<button
 					class="btn btn-xs btn-danger"
-					data-on-click={ "@delete('/api/files/" + remote + "?path=" + path + "/" + item.Name + "')" }
+					data-on:click={ "@delete('/api/files/" + remote + "?path=" + path + "/" + item.Name + "')" }
 				>
 					Delete
 				</button>

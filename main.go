@@ -26,7 +26,7 @@ import (
 	"github.com/joeblew999/plat-rclone/templates"
 )
 
-//go:embed static/css/style.css
+//go:embed static/*
 var staticFS embed.FS
 
 var th = material.NewTheme()
@@ -147,10 +147,15 @@ func startWebServer() string {
 func setupRoutes(rc *rclone.Client) *router.Router {
 	r := router.New()
 
-	// Embedded CSS
+	// Embedded static files
 	r.Mux.Get("/static/css/style.css", func(w http.ResponseWriter, req *http.Request) {
 		data, _ := staticFS.ReadFile("static/css/style.css")
 		w.Header().Set("Content-Type", "text/css")
+		w.Write(data)
+	})
+	r.Mux.Get("/static/js/datastar.js", func(w http.ResponseWriter, req *http.Request) {
+		data, _ := staticFS.ReadFile("static/js/datastar.js")
+		w.Header().Set("Content-Type", "application/javascript")
 		w.Write(data)
 	})
 
