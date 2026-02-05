@@ -140,24 +140,22 @@ tasks:
       - goup-util package macos .
 
   release:linux:
-    desc: Build Linux release (web binaries)
+    desc: Build Linux release (web binaries only, no GUI)
     deps: [templ]
     cmds:
       - xplat os mkdir -p .dist
       - task: build
       - task: build-full
-      - goup-util package linux .
+      - xplat os cp .bin/{{.BINARY}}-web .dist/{{.BINARY}}-linux-amd64
+      - xplat os cp .bin/{{.BINARY}}-web-full .dist/{{.BINARY}}-full-linux-amd64
 
   release:windows:
-    desc: Build Windows release (web binaries)
+    desc: Build Windows release (web binaries only)
     deps: [templ]
-    vars:
-      EXT: .exe
     cmds:
       - xplat os mkdir -p .dist
-      - go build -o .bin/{{.BINARY}}-web{{.EXT}} ./cmd/plat-rclone
-      - go build -tags=rclone_full -o .bin/{{.BINARY}}-web-full{{.EXT}} ./cmd/plat-rclone
-      - goup-util package windows .
+      - go build -o .dist/{{.BINARY}}-windows-amd64.exe ./cmd/plat-rclone
+      - go build -tags=rclone_full -o .dist/{{.BINARY}}-full-windows-amd64.exe ./cmd/plat-rclone
 
   # === Utils ===
 
