@@ -114,7 +114,7 @@ tools:
 
 ```yaml
 # CI just calls the same tasks
-- run: xplat task tools   # Idempotent - skips if tools exist
+- run: xplat task setup   # Idempotent - skips if tools exist
 - run: xplat task build
 - run: xplat task test
 ```
@@ -190,10 +190,10 @@ make test                   # Run tests
 ```bash
 # Install xplat, then all tools (templ, goup-util) in one command
 curl -fsSL https://raw.githubusercontent.com/joeblew999/xplat/main/install.sh | sh
-xplat task tools    # Installs templ + goup-util (idempotent)
+xplat task setup    # Installs templ + goup-util (idempotent)
 ```
 
-Tools are installed idempotently - running `xplat task tools` multiple times is safe and fast.
+Tools are installed idempotently - running `xplat task setup` multiple times is safe and fast.
 
 ## References
 

@@ -28,7 +28,7 @@ jobs:
 
       - name: Build & Test
         run: |
-          xplat task tools
+          xplat task setup
           xplat task build
           xplat task test
 
@@ -57,7 +57,7 @@ jobs:
           token: ${{ github.token }}
 
       - name: Install tools
-        run: xplat task tools
+        run: xplat task setup
 
       - name: Build web binaries
         shell: bash
