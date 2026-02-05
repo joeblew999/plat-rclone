@@ -156,7 +156,15 @@ tasks:
 
   setup:
     desc: Install all required tools (idempotent, cross-platform)
-    deps: [setup:templ, setup:goup]
+    deps: [setup:templ, setup:goup, setup:gogio]
+
+  setup:gogio:
+    desc: Install gogio (Gio build tool)
+    internal: true
+    status:
+      - xplat os which gogio
+    cmds:
+      - go install gioui.org/cmd/gogio@latest
 
   setup:templ:
     desc: Install templ
