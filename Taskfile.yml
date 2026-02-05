@@ -185,7 +185,7 @@ tasks:
   test:
     desc: Run tests
     cmds:
-      - go test ./...
+      - go test ./cmd/... ./pkg/... ./templates/...
 
   fmt:
     desc: Format code
