@@ -1,4 +1,4 @@
-.PHONY: all clean templ macos ios android windows web run-macos ios-sim run-web dev download datastar icons tools test fmt help
+.PHONY: all clean templ macos ios android windows web run-macos ios-sim run-web dev download datastar icons tools test fmt help screenshot
 
 # Datastar JS version (must match Go SDK)
 DATASTAR_VERSION := v1.0.0-RC.7
@@ -69,6 +69,10 @@ datastar:  # Download Datastar JS bundles (must match Go SDK version)
 
 icons:  # Generate app icons from icon-source.png
 	@$(GOUP) icons .
+
+screenshot:  # Take iOS simulator screenshot (requires goup-util with CGO)
+	@xcrun simctl io booted screenshot docs/ios-screenshot.png
+	@echo "Screenshot saved to docs/ios-screenshot.png"
 
 clean:  # Remove build outputs
 	@rm -rf .bin .build
