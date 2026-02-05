@@ -155,15 +155,25 @@ tasks:
   # === Setup ===
 
   tools:
-    desc: Install required Go tools
+    desc: Install all required tools (idempotent)
+    deps: [tools:templ, tools:goup]
+
+  tools:templ:
+    desc: Install templ
+    internal: true
+    status:
+      - which templ
     cmds:
       - go install github.com/a-h/templ/cmd/templ@latest
 
-  install-goup:
+  tools:goup:
     desc: Install goup-util
+    internal: true
+    platforms: [linux, darwin]
+    status:
+      - which goup-util
     cmds:
       - 'curl -fsSL "https://github.com/joeblew999/goup-util/releases/download/{{.GOUP_VERSION}}/goup-util_$(uname -s)_$(uname -m).tar.gz" | tar -xz -C /usr/local/bin goup-util'
-      - goup-util --help | head -1
 
   # === Quality ===
 
