@@ -1,0 +1,172 @@
+package templates
+
+import "fmt"
+
+type StatsInfo struct {
+	Bytes           string
+	Checks          int64
+	DeletedDirs     int64
+	Deletes         int64
+	ElapsedTime     string
+	Errors          int64
+	Eta             string
+	FatalError      bool
+	Renames         int64
+	RetryError      bool
+	ServerSideCopies int64
+	ServerSideMoves  int64
+	Speed           string
+	TotalBytes      string
+	TotalChecks     int64
+	TotalTransfers  int64
+	TransferTime    string
+	Transfers       int64
+	Transferring    []TransferInfo
+}
+
+type TransferInfo struct {
+	Name       string
+	Size       string
+	Percentage int
+	Speed      string
+	Eta        string
+}
+
+type VersionInfo struct {
+	Version   string
+	GoVersion string
+	Os        string
+	Arch      string
+}
+
+templ StatsPage(stats StatsInfo, version VersionInfo) {
+	@Layout("Stats") {
+		<div class="page-header">
+			<h1>Statistics</h1>
+			<button
+				class="btn btn-primary"
+				data-on:click="@get('/api/stats/refresh')"
+			>
+				Refresh
+			</button>
+		</div>
+		<div id="stats-content" data-on:load="@get('/api/stats/refresh')">
+			@StatsContent(stats, version)
+		</div>
+	}
+}
+
+templ StatsContent(stats StatsInfo, version VersionInfo) {
+	<div class="stats-grid">
+		<div class="card stats-card">
+			<h3>rclone Version</h3>
+			<div class="stats-details">
+				<div class="stat-row">
+					<span class="label">Version:</span>
+					<span class="value">{ version.Version }</span>
+				</div>
+				<div class="stat-row">
+					<span class="label">Go:</span>
+					<span class="value">{ version.GoVersion }</span>
+				</div>
+				<div class="stat-row">
+					<span class="label">Platform:</span>
+					<span class="value">{ version.Os }/{ version.Arch }</span>
+				</div>
+			</div>
+		</div>
+		<div class="card stats-card">
+			<h3>Transfer Stats</h3>
+			<div class="stats-details">
+				<div class="stat-row">
+					<span class="label">Transferred:</span>
+					<span class="value">{ stats.Bytes }</span>
+				</div>
+				<div class="stat-row">
+					<span class="label">Speed:</span>
+					<span class="value">{ stats.Speed }</span>
+				</div>
+				<div class="stat-row">
+					<span class="label">ETA:</span>
+					<span class="value">{ stats.Eta }</span>
+				</div>
+				<div class="stat-row">
+					<span class="label">Elapsed:</span>
+					<span class="value">{ stats.ElapsedTime }</span>
+				</div>
+			</div>
+		</div>
+		<div class="card stats-card">
+			<h3>Operations</h3>
+			<div class="stats-details">
+				<div class="stat-row">
+					<span class="label">Transfers:</span>
+					<span class="value big">{ formatInt(stats.Transfers) } / { formatInt(stats.TotalTransfers) }</span>
+				</div>
+				<div class="stat-row">
+					<span class="label">Checks:</span>
+					<span class="value">{ formatInt(stats.Checks) } / { formatInt(stats.TotalChecks) }</span>
+				</div>
+				<div class="stat-row">
+					<span class="label">Errors:</span>
+					<span class={ "value", errorClass(stats.Errors) }>{ formatInt(stats.Errors) }</span>
+				</div>
+				<div class="stat-row">
+					<span class="label">Deletes:</span>
+					<span class="value">{ formatInt(stats.Deletes) }</span>
+				</div>
+			</div>
+		</div>
+	</div>
+	if len(stats.Transferring) > 0 {
+		<div class="card">
+			<h3>Active Transfers</h3>
+			<table class="file-table">
+				<thead>
+					<tr>
+						<th>Name</th>
+						<th>Size</th>
+						<th>Progress</th>
+						<th>Speed</th>
+						<th>ETA</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, t := range stats.Transferring {
+						<tr>
+							<td>{ t.Name }</td>
+							<td>{ t.Size }</td>
+							<td>
+								<div class="progress-bar small">
+									<div class="progress-fill" style={ progressStyle(t.Percentage) }></div>
+									<span class="progress-text">{ formatPercent(t.Percentage) }</span>
+								</div>
+							</td>
+							<td>{ t.Speed }</td>
+							<td>{ t.Eta }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+func formatInt(n int64) string {
+	return fmt.Sprintf("%d", n)
+}
+
+func formatPercent(n int) string {
+	return fmt.Sprintf("%d%%", n)
+}
+
+func progressStyle(n int) string {
+	return fmt.Sprintf("width: %d%%", n)
+}
+
+func errorClass(errors int64) string {
+	if errors > 0 {
+		return "error"
+	}
+	return ""
+}

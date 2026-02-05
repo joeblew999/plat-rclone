@@ -172,9 +172,19 @@ func cmdServe() {
 	r.Page("/", func(ctx *router.Context) (string, error) {
 		remotes, err := getRemotesInfo(rc)
 		if err != nil {
-			remotes = []templates.RemoteInfo{} // Empty list on error
+			remotes = []templates.RemoteInfo{}
 		}
 		return datastar.RenderTempl(templates.RemotesPage(remotes))
+	})
+
+	r.Page("/jobs", func(ctx *router.Context) (string, error) {
+		jobs, _ := getJobsInfo(rc)
+		return datastar.RenderTempl(templates.JobsPage(jobs))
+	})
+
+	r.Page("/stats", func(ctx *router.Context) (string, error) {
+		stats, version := getStatsInfo(rc)
+		return datastar.RenderTempl(templates.StatsPage(stats, version))
 	})
 
 	// API: Refresh remotes list
@@ -243,6 +253,35 @@ func cmdServe() {
 		return sse.Redirect("/api/remotes/" + remote + "/browse")
 	})
 
+	// Jobs API
+	r.GET("/api/jobs/refresh", func(ctx *router.Context) error {
+		sse := ctx.SSE()
+		jobs, err := getJobsInfo(rc)
+		if err != nil {
+			return sse.PatchHTMLByID("jobs-list", `<div class="error">`+err.Error()+`</div>`)
+		}
+		return sse.PatchTemplByID("jobs-list", templates.JobsList(jobs))
+	})
+
+	r.POST("/api/jobs/{id}/stop", func(ctx *router.Context) error {
+		sse := ctx.SSE()
+		id := ctx.Param("id")
+		var jobID int64
+		fmt.Sscanf(id, "%d", &jobID)
+		if err := rc.StopJob(jobID); err != nil {
+			return sse.PatchHTMLByID(fmt.Sprintf("job-%d", jobID), `<div class="error">`+err.Error()+`</div>`)
+		}
+		jobs, _ := getJobsInfo(rc)
+		return sse.PatchTemplByID("jobs-list", templates.JobsList(jobs))
+	})
+
+	// Stats API
+	r.GET("/api/stats/refresh", func(ctx *router.Context) error {
+		sse := ctx.SSE()
+		stats, version := getStatsInfo(rc)
+		return sse.PatchTemplByID("stats-content", templates.StatsContent(stats, version))
+	})
+
 	fmt.Printf("plat-rclone starting on %s\n", addr)
 	fmt.Printf("rclone RC API: %s\n", rcloneURL)
 	fmt.Println("Open http://localhost" + addr)
@@ -283,4 +322,96 @@ func formatSize(bytes int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+func getJobsInfo(rc *rclone.Client) ([]templates.JobInfo, error) {
+	jobs, err := rc.ListJobs()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]templates.JobInfo, len(jobs))
+	for i, job := range jobs {
+		status := "running"
+		if job.Finished {
+			if job.Success {
+				status = "finished"
+			} else {
+				status = "error"
+			}
+		}
+		result[i] = templates.JobInfo{
+			ID:        job.ID,
+			Group:     job.Group,
+			StartTime: job.StartTime,
+			Status:    status,
+			Error:     job.Error,
+		}
+	}
+	return result, nil
+}
+
+func getStatsInfo(rc *rclone.Client) (templates.StatsInfo, templates.VersionInfo) {
+	stats := templates.StatsInfo{
+		Bytes:       "0 B",
+		Speed:       "0 B/s",
+		Eta:         "-",
+		ElapsedTime: "0s",
+	}
+	version := templates.VersionInfo{
+		Version:   "unknown",
+		GoVersion: "unknown",
+		Os:        "unknown",
+		Arch:      "unknown",
+	}
+
+	if s, err := rc.Stats(); err == nil {
+		if b, ok := s["bytes"].(float64); ok {
+			stats.Bytes = formatSize(int64(b))
+		}
+		if sp, ok := s["speed"].(float64); ok {
+			stats.Speed = formatSize(int64(sp)) + "/s"
+		}
+		if eta, ok := s["eta"].(float64); ok {
+			stats.Eta = fmt.Sprintf("%.0fs", eta)
+		}
+		if elapsed, ok := s["elapsedTime"].(float64); ok {
+			stats.ElapsedTime = fmt.Sprintf("%.1fs", elapsed)
+		}
+		if t, ok := s["transfers"].(float64); ok {
+			stats.Transfers = int64(t)
+		}
+		if tt, ok := s["totalTransfers"].(float64); ok {
+			stats.TotalTransfers = int64(tt)
+		}
+		if c, ok := s["checks"].(float64); ok {
+			stats.Checks = int64(c)
+		}
+		if tc, ok := s["totalChecks"].(float64); ok {
+			stats.TotalChecks = int64(tc)
+		}
+		if e, ok := s["errors"].(float64); ok {
+			stats.Errors = int64(e)
+		}
+		if d, ok := s["deletes"].(float64); ok {
+			stats.Deletes = int64(d)
+		}
+	}
+
+	if v, err := rc.Version(); err == nil {
+		if ver, ok := v["version"].(string); ok {
+			version.Version = ver
+		}
+		if gv, ok := v["goVersion"].(string); ok {
+			version.GoVersion = gv
+		}
+		if os, ok := v["os"].(string); ok {
+			version.Os = os
+		}
+		if arch, ok := v["arch"].(string); ok {
+			version.Arch = arch
+		}
+	}
+
+	return stats, version
 }

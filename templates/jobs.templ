@@ -1,0 +1,109 @@
+package templates
+
+import "fmt"
+
+type JobInfo struct {
+	ID        int64
+	Group     string
+	StartTime string
+	Duration  string
+	Progress  int
+	Speed     string
+	Status    string // running, finished, error
+	Error     string
+}
+
+templ JobsPage(jobs []JobInfo) {
+	@Layout("Jobs") {
+		<div class="page-header">
+			<h1>Jobs</h1>
+			<button
+				class="btn btn-primary"
+				data-on:click="@get('/api/jobs/refresh')"
+			>
+				Refresh
+			</button>
+		</div>
+		<div id="jobs-list" data-on:load="@get('/api/jobs/refresh')">
+			@JobsList(jobs)
+		</div>
+	}
+}
+
+templ JobsList(jobs []JobInfo) {
+	if len(jobs) == 0 {
+		<div class="empty-state">
+			<p>No active jobs</p>
+			<p class="hint">Start a sync or copy operation to see jobs here</p>
+		</div>
+	} else {
+		<div class="jobs-grid">
+			for _, job := range jobs {
+				@JobCard(job)
+			}
+		</div>
+	}
+}
+
+templ JobCard(job JobInfo) {
+	<div class="card job-card" id={ fmt.Sprintf("job-%d", job.ID) }>
+		<div class="card-header">
+			<h3>Job #{ fmt.Sprintf("%d", job.ID) }</h3>
+			<span class={ "badge", statusClass(job.Status) }>{ job.Status }</span>
+		</div>
+		<div class="job-details">
+			<div class="job-row">
+				<span class="label">Group:</span>
+				<span class="value">{ job.Group }</span>
+			</div>
+			<div class="job-row">
+				<span class="label">Started:</span>
+				<span class="value">{ job.StartTime }</span>
+			</div>
+			if job.Duration != "" {
+				<div class="job-row">
+					<span class="label">Duration:</span>
+					<span class="value">{ job.Duration }</span>
+				</div>
+			}
+			if job.Speed != "" {
+				<div class="job-row">
+					<span class="label">Speed:</span>
+					<span class="value">{ job.Speed }</span>
+				</div>
+			}
+			if job.Progress > 0 {
+				<div class="progress-bar">
+					<div class="progress-fill" style={ fmt.Sprintf("width: %d%%", job.Progress) }></div>
+					<span class="progress-text">{ fmt.Sprintf("%d%%", job.Progress) }</span>
+				</div>
+			}
+			if job.Error != "" {
+				<div class="job-error">{ job.Error }</div>
+			}
+		</div>
+		<div class="card-actions">
+			if job.Status == "running" {
+				<button
+					class="btn btn-sm btn-danger"
+					data-on:click={ fmt.Sprintf("@post('/api/jobs/%d/stop')", job.ID) }
+				>
+					Stop
+				</button>
+			}
+		</div>
+	</div>
+}
+
+func statusClass(status string) string {
+	switch status {
+	case "running":
+		return "badge-info"
+	case "finished":
+		return "badge-success"
+	case "error":
+		return "badge-danger"
+	default:
+		return ""
+	}
+}
