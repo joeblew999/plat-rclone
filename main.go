@@ -1,0 +1,242 @@
+// plat-rclone - Cross-platform GUI for rclone
+// Build with: goup-util build macos|ios|android .
+package main
+
+import (
+	"embed"
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"time"
+
+	"gioui.org/app"
+	"gioui.org/f32"
+	"gioui.org/font/gofont"
+	"gioui.org/op"
+	"gioui.org/text"
+	"gioui.org/widget/material"
+	"github.com/gioui-plugins/gio-plugins/plugin/gioplugins"
+	"github.com/gioui-plugins/gio-plugins/webviewer/giowebview"
+	"github.com/gioui-plugins/gio-plugins/webviewer/webview"
+
+	"github.com/joeblew999/plat-rclone/pkg/datastar"
+	"github.com/joeblew999/plat-rclone/pkg/rclone"
+	"github.com/joeblew999/plat-rclone/pkg/router"
+	"github.com/joeblew999/plat-rclone/templates"
+)
+
+//go:embed static/css/style.css
+var staticFS embed.FS
+
+var th = material.NewTheme()
+
+func main() {
+	th.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
+	webview.SetDebug(os.Getenv("DEBUG") == "1")
+
+	// Start embedded HTTP server
+	serverURL := startWebServer()
+	fmt.Printf("Server started at %s\n", serverURL)
+
+	// Launch Gio app with webview
+	go runApp(serverURL)
+	app.Main()
+}
+
+func runApp(serverURL string) {
+	window := &app.Window{}
+	window.Option(app.Title("plat-rclone"))
+	window.Option(app.Size(1200, 800))
+
+	var ops op.Ops
+	webviewTag := new(int)
+	navigated := false
+	frameCount := 0
+
+	window.Invalidate()
+
+	for {
+		evt := gioplugins.Hijack(window)
+
+		switch evt := evt.(type) {
+		case app.DestroyEvent:
+			os.Exit(0)
+			return
+
+		case app.FrameEvent:
+			gtx := app.NewContext(&ops, evt)
+
+			// Process webview events
+			for {
+				ev, ok := gioplugins.Event(gtx, giowebview.Filter{Target: webviewTag})
+				if !ok {
+					break
+				}
+				switch e := ev.(type) {
+				case giowebview.NavigationEvent:
+					fmt.Printf("Navigation: %s\n", e.URL)
+				case giowebview.TitleEvent:
+					fmt.Printf("Title: %s\n", e.Title)
+				}
+			}
+
+			// Render WebView - fills entire window
+			webviewStack := giowebview.WebViewOp{Tag: webviewTag}.Push(gtx.Ops)
+			giowebview.OffsetOp{Point: f32.Point{X: 0, Y: 0}}.Add(gtx.Ops)
+			giowebview.RectOp{
+				Size: f32.Point{
+					X: float32(gtx.Constraints.Max.X),
+					Y: float32(gtx.Constraints.Max.Y),
+				},
+			}.Add(gtx.Ops)
+			webviewStack.Pop(gtx.Ops)
+
+			// Navigate after frames to ensure webview is ready
+			frameCount++
+			if !navigated && frameCount > 10 {
+				fmt.Printf("Navigating to: %s\n", serverURL)
+				gioplugins.Execute(gtx, giowebview.NavigateCmd{
+					View: webviewTag,
+					URL:  serverURL,
+				})
+				navigated = true
+			}
+
+			// Request frames until navigated
+			if !navigated {
+				gtx.Execute(op.InvalidateCmd{})
+			}
+
+			evt.Frame(gtx.Ops)
+		}
+	}
+}
+
+func startWebServer() string {
+	rcloneURL := os.Getenv("RCLONE_URL")
+	if rcloneURL == "" {
+		rcloneURL = "http://localhost:5572"
+	}
+
+	rc := rclone.NewClient(rcloneURL)
+
+	// Find available port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		panic(err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+
+	r := setupRoutes(rc)
+	serverAddr := fmt.Sprintf("127.0.0.1:%d", port)
+
+	go func() {
+		if err := http.ListenAndServe(serverAddr, r.Mux); err != nil {
+			fmt.Printf("Server error: %v\n", err)
+		}
+	}()
+
+	// Give server time to start
+	time.Sleep(200 * time.Millisecond)
+
+	return fmt.Sprintf("http://%s", serverAddr)
+}
+
+func setupRoutes(rc *rclone.Client) *router.Router {
+	r := router.New()
+
+	// Embedded CSS
+	r.Mux.Get("/static/css/style.css", func(w http.ResponseWriter, req *http.Request) {
+		data, _ := staticFS.ReadFile("static/css/style.css")
+		w.Header().Set("Content-Type", "text/css")
+		w.Write(data)
+	})
+
+	// Pages
+	r.Page("/", func(ctx *router.Context) (string, error) {
+		remotes, err := getRemotesInfo(rc)
+		if err != nil {
+			remotes = []templates.RemoteInfo{}
+		}
+		return datastar.RenderTempl(templates.RemotesPage(remotes))
+	})
+
+	// API routes
+	r.GET("/api/remotes/refresh", func(ctx *router.Context) error {
+		sse := ctx.SSE()
+		remotes, err := getRemotesInfo(rc)
+		if err != nil {
+			return sse.PatchHTMLByID("remotes-list", `<div class="error">`+err.Error()+`</div>`)
+		}
+		return sse.PatchTemplByID("remotes-list", templates.RemotesList(remotes))
+	})
+
+	r.GET("/api/remotes/{name}/browse", func(ctx *router.Context) error {
+		sse := ctx.SSE()
+		name := ctx.Param("name")
+		path := ctx.Query("path")
+		if path == ".." {
+			path = ""
+		}
+
+		items, err := rc.List(name, path)
+		if err != nil {
+			return sse.PatchHTMLByID("file-browser", `<div class="error">`+err.Error()+`</div>`)
+		}
+
+		fileItems := make([]templates.FileItem, len(items))
+		for i, item := range items {
+			fileItems[i] = templates.FileItem{
+				Name:    item.Name,
+				Size:    formatSize(item.Size),
+				ModTime: item.ModTime,
+				IsDir:   item.IsDir,
+			}
+		}
+		return sse.PatchTempl(templates.FileBrowser(name, path, fileItems))
+	})
+
+	r.DELETE("/api/remotes/{name}", func(ctx *router.Context) error {
+		sse := ctx.SSE()
+		name := ctx.Param("name")
+		if err := rc.DeleteRemote(name); err != nil {
+			return sse.PatchHTMLByID("remotes-list", `<div class="error">`+err.Error()+`</div>`)
+		}
+		return sse.RemoveByID("remote-" + name)
+	})
+
+	return r
+}
+
+func getRemotesInfo(rc *rclone.Client) ([]templates.RemoteInfo, error) {
+	names, err := rc.ListRemotes()
+	if err != nil {
+		return nil, err
+	}
+
+	remotes := make([]templates.RemoteInfo, len(names))
+	for i, name := range names {
+		config, _ := rc.GetRemote(name)
+		remoteType := "unknown"
+		if t, ok := config["type"]; ok {
+			remoteType = t
+		}
+		remotes[i] = templates.RemoteInfo{Name: name, Type: remoteType}
+	}
+	return remotes, nil
+}
+
+func formatSize(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}

@@ -1,0 +1,130 @@
+package templates
+
+type RemoteInfo struct {
+	Name string
+	Type string
+}
+
+templ RemotesPage(remotes []RemoteInfo) {
+	@Layout("Remotes") {
+		<div class="page-header">
+			<h1>Remotes</h1>
+			<button
+				class="btn btn-primary"
+				data-on-click="@get('/api/remotes/refresh')"
+			>
+				Refresh
+			</button>
+		</div>
+		<div id="remotes-list">
+			@RemotesList(remotes)
+		</div>
+	}
+}
+
+templ RemotesList(remotes []RemoteInfo) {
+	if len(remotes) == 0 {
+		<div class="empty-state">
+			<p>No remotes configured</p>
+			<p class="hint">Start rclone with: <code>rclone rcd --rc-web-gui</code></p>
+		</div>
+	} else {
+		<div class="card-grid">
+			for _, r := range remotes {
+				@RemoteCard(r)
+			}
+		</div>
+	}
+}
+
+templ RemoteCard(r RemoteInfo) {
+	<div class="card" id={ "remote-" + r.Name }>
+		<div class="card-header">
+			<h3>{ r.Name }</h3>
+			<span class="badge">{ r.Type }</span>
+		</div>
+		<div class="card-actions">
+			<button
+				class="btn btn-sm"
+				data-on-click={ "@get('/api/remotes/" + r.Name + "/browse')" }
+			>
+				Browse
+			</button>
+			<button
+				class="btn btn-sm btn-danger"
+				data-on-click={ "@delete('/api/remotes/" + r.Name + "')" }
+			>
+				Delete
+			</button>
+		</div>
+	</div>
+}
+
+templ FileBrowser(remote string, path string, items []FileItem) {
+	<div id="file-browser" class="file-browser">
+		<div class="browser-header">
+			<h2>{ remote }:{ path }</h2>
+			if path != "" {
+				<button
+					class="btn btn-sm"
+					data-on-click={ "@get('/api/remotes/" + remote + "/browse?path=..')" }
+				>
+					↑ Up
+				</button>
+			}
+		</div>
+		<table class="file-table">
+			<thead>
+				<tr>
+					<th>Name</th>
+					<th>Size</th>
+					<th>Modified</th>
+					<th>Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, item := range items {
+					@FileRow(remote, path, item)
+				}
+			</tbody>
+		</table>
+	</div>
+}
+
+type FileItem struct {
+	Name    string
+	Size    string
+	ModTime string
+	IsDir   bool
+}
+
+templ FileRow(remote, path string, item FileItem) {
+	<tr>
+		<td>
+			if item.IsDir {
+				<span class="icon">📁</span>
+				<a
+					href="#"
+					data-on-click={ "@get('/api/remotes/" + remote + "/browse?path=" + path + "/" + item.Name + "')" }
+				>
+					{ item.Name }
+				</a>
+			} else {
+				<span class="icon">📄</span>
+				{ item.Name }
+			}
+		</td>
+		<td>{ item.Size }</td>
+		<td>{ item.ModTime }</td>
+		<td>
+			if !item.IsDir {
+				<button
+					class="btn btn-xs btn-danger"
+					data-on-click={ "@delete('/api/files/" + remote + "?path=" + path + "/" + item.Name + "')" }
+				>
+					Delete
+				</button>
+			}
+		</td>
+	</tr>
+}
