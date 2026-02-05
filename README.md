@@ -2,6 +2,10 @@
 
 Cross-platform GUI for [rclone](https://rclone.org) using Datastar + Gio.
 
+![Remotes View](docs/remotes-view.png)
+
+![File Browser](docs/file-browser.png)
+
 ## Features
 
 - **Cross-platform** - macOS, iOS, Android, Windows

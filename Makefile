@@ -14,17 +14,19 @@ templ:
 	@templ generate
 
 # === Platform Builds ===
+# Uses goup-util to build native Gio apps with embedded webview
+# Output: .bin/plat-rclone.{app,apk,exe}
 
-macos: templ
+macos: templ  # Build macOS .app bundle
 	@$(GOUP) build macos .
 
-ios: templ
+ios: templ  # Build iOS .app for device/simulator
 	@$(GOUP) build ios .
 
-android: templ
+android: templ  # Build Android .apk
 	@$(GOUP) build android .
 
-windows: templ
+windows: templ  # Build Windows .exe with embedded icon
 	@$(GOUP) build windows .
 
 # === Run ===
@@ -37,22 +39,23 @@ ios-sim: ios
 	@xcrun simctl launch booted com.github.plat_rclone
 
 # === Web Server ===
+# Headless mode - serve via HTTP for browsers (no native UI)
 
-web: templ
+web: templ  # Build standalone web server binary
 	@go build -o .bin/plat-rclone-web ./cmd/plat-rclone
 
-run-web: web
+run-web: web  # Run web server on http://localhost:8080
 	@.bin/plat-rclone-web serve
 
-dev: templ
+dev: templ  # Development mode with hot reload (go run)
 	@go run ./cmd/plat-rclone serve
 
 # === Utils ===
 
-download:
+download:  # Download rclone binary for current platform
 	@go run ./cmd/plat-rclone download .bin
 
-datastar:
+datastar:  # Download Datastar JS bundles (must match Go SDK version)
 	@mkdir -p static/js
 	@echo "Downloading Datastar $(DATASTAR_VERSION) bundles..."
 	@curl -sL "https://raw.githubusercontent.com/starfederation/datastar/$(DATASTAR_VERSION)/bundles/datastar.js" -o static/js/datastar.js
@@ -64,43 +67,39 @@ datastar:
 	@echo "Downloaded all bundles:"
 	@ls -lh static/js/datastar*.js
 
-icons:
+icons:  # Generate app icons from icon-source.png
 	@$(GOUP) icons .
 
-clean:
+clean:  # Remove build outputs
 	@rm -rf .bin .build
 	@echo "Cleaned"
 
-tools:
+tools:  # Install required Go tools
 	@go install github.com/a-h/templ/cmd/templ@latest
 
-test:
+test:  # Run all tests
 	@go test ./...
 
-fmt:
+fmt:  # Format Go and templ files
 	@go fmt ./...
 	@templ fmt templates/
 
 # === Help ===
 
-help:
+help:  # Show this help
 	@echo "plat-rclone - Cross-platform GUI for rclone"
 	@echo ""
-	@echo "Build:"
-	@echo "  make all        Build all platforms"
-	@echo "  make macos      macOS app"
-	@echo "  make ios        iOS app"
-	@echo "  make android    Android APK"
-	@echo "  make windows    Windows exe"
-	@echo "  make web        Web server"
+	@echo "Build:                              Run:"
+	@echo "  make all       All platforms        make run-macos  Run macOS app"
+	@echo "  make macos     macOS .app           make run-web    Web :8080"
+	@echo "  make ios       iOS .app             make dev        Dev mode"
+	@echo "  make android   Android .apk         make ios-sim    iOS simulator"
+	@echo "  make windows   Windows .exe"
+	@echo "  make web       Web server"
 	@echo ""
-	@echo "Run:"
-	@echo "  make run-macos  Run macOS"
-	@echo "  make ios-sim    iOS simulator"
-	@echo "  make run-web    Web :8080"
-	@echo "  make dev        Dev mode"
+	@echo "Utils:                              Setup:"
+	@echo "  make download  Get rclone binary    make tools      Install templ"
+	@echo "  make datastar  Update Datastar JS   make icons      Generate icons"
+	@echo "  make clean     Remove build files"
 	@echo ""
-	@echo "Utils:"
-	@echo "  make download   Get rclone"
-	@echo "  make datastar   Update Datastar JS"
-	@echo "  make clean      Clean"
+	@echo "Datastar: Go SDK v1.1.0 requires JS v$(DATASTAR_VERSION)"
