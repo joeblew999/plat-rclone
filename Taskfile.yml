@@ -137,7 +137,9 @@ tasks:
       - task: macos
       - task: build
       - task: build-full
-      - goup-util package macos .
+      # Zip app bundle for distribution
+      - cd .bin && zip -r ../{{.BINARY}}-macos.zip *.app || cd macos && zip -r ../../.dist/{{.BINARY}}-macos.zip *.app
+      - xplat os mv {{.BINARY}}-macos.zip .dist/ 2>/dev/null || true
 
   release:linux:
     desc: Build Linux release (web binaries only, no GUI)
