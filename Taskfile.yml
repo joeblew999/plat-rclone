@@ -171,11 +171,11 @@ tasks:
     internal: true
     vars:
       EXT: '{{if eq OS "windows"}}.exe{{end}}'
-      BIN: '{{if eq OS "windows"}}{{.USERPROFILE}}/go/bin{{else}}/usr/local/bin{{end}}'
+      BIN: '{{if eq OS "windows"}}{{.USERPROFILE}}/go/bin{{else}}{{.HOME}}/.local/bin{{end}}'
     status:
       - xplat os which goup-util
     cmds:
-      - xplat os mkdir {{.BIN}}
+      - xplat os mkdir -p {{.BIN}}
       - xplat os fetch -o {{.BIN}} "https://github.com/joeblew999/goup-util/releases/download/{{.GOUP_VERSION}}/goup-util-{{OS}}-{{ARCH}}{{.EXT}}"
       - xplat os mv {{.BIN}}/goup-util-{{OS}}-{{ARCH}}{{.EXT}} {{.BIN}}/goup-util{{.EXT}}
       - '{{if ne OS "windows"}}chmod +x {{.BIN}}/goup-util{{end}}'
