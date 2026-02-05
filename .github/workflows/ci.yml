@@ -1,0 +1,113 @@
+# CI/CD workflow for plat-rclone
+# Triggers:
+#   - Push/PR to main: Build + Test
+#   - Tag push (v*): Build + Test + Release all platforms
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Setup xplat
+        uses: joeblew999/xplat/.github/actions/setup@main
+        with:
+          token: ${{ github.token }}
+
+      - name: Build & Test
+        run: |
+          xplat task tools
+          xplat task build
+          xplat task test
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: macos
+          - os: windows-latest
+            platform: windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Setup xplat
+        uses: joeblew999/xplat/.github/actions/setup@main
+        with:
+          token: ${{ github.token }}
+
+      - name: Install tools
+        run: xplat task tools
+
+      - name: Install goup-util (Unix)
+        if: matrix.platform != 'windows'
+        run: xplat task install-goup
+
+      - name: Build web binaries
+        shell: bash
+        run: |
+          xplat task templ
+          SUFFIX="${{ matrix.platform == 'windows' && '.exe' || '' }}"
+          ARCH="${{ runner.arch == 'X64' && 'amd64' || 'arm64' }}"
+          go build -o "plat-rclone-${{ matrix.platform }}-${ARCH}${SUFFIX}" ./cmd/plat-rclone
+          go build -tags=rclone_full -o "plat-rclone-full-${{ matrix.platform }}-${ARCH}${SUFFIX}" ./cmd/plat-rclone
+
+      - name: Build macOS app
+        if: matrix.platform == 'macos'
+        run: |
+          goup-util build macos .
+          zip -r plat-rclone-macos-app.zip .bin/*.app
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: plat-rclone-${{ matrix.platform }}
+          path: plat-rclone-*
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Create checksums
+        working-directory: release
+        run: sha256sum * > checksums.txt 2>/dev/null || true
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "plat-rclone ${GITHUB_REF_NAME}" \
+            --generate-release-notes \
+            release/*

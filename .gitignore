@@ -1,6 +1,8 @@
-# goup-util output
+# Build output
 .bin/
 .build/
+.releases/
+.task/
 
 # Playwright MCP logs
 .playwright-mcp/

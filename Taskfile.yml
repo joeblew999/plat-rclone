@@ -1,0 +1,191 @@
+# Taskfile.yml - Build automation for plat-rclone
+# Use with: xplat task <name> or task <name>
+version: '3'
+
+vars:
+  DATASTAR_VERSION: v1.0.0-RC.7
+  GOUP_VERSION: v2.0.0
+  BINARY: plat-rclone
+
+tasks:
+  # === Development ===
+
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  dev:
+    desc: Run dev server (HTTP mode - needs rclone rcd)
+    deps: [templ]
+    cmds:
+      - go run ./cmd/plat-rclone serve
+
+  dev-embedded:
+    desc: Run dev server (embedded rclone, local backend)
+    deps: [templ]
+    cmds:
+      - go run ./cmd/plat-rclone serve -embedded
+
+  dev-embedded-full:
+    desc: Run dev server (embedded rclone, all backends)
+    deps: [templ]
+    cmds:
+      - go run -tags=rclone_full ./cmd/plat-rclone serve -embedded
+
+  # === Build ===
+
+  templ:
+    desc: Generate templ files
+    cmds:
+      - templ generate
+    sources:
+      - templates/*.templ
+    generates:
+      - templates/*_templ.go
+
+  build:
+    desc: Build web server binary
+    deps: [templ]
+    cmds:
+      - go build -o .bin/{{.BINARY}}-web ./cmd/plat-rclone
+
+  build-full:
+    desc: Build with all rclone backends
+    deps: [templ]
+    cmds:
+      - go build -tags=rclone_full -o .bin/{{.BINARY}}-web-full ./cmd/plat-rclone
+
+  # === Native Apps (via goup-util) ===
+
+  macos:
+    desc: Build macOS .app bundle
+    deps: [templ]
+    cmds:
+      - goup-util build macos .
+
+  ios:
+    desc: Build iOS .app
+    deps: [templ]
+    cmds:
+      - goup-util build ios .
+
+  android:
+    desc: Build Android .apk
+    deps: [templ]
+    cmds:
+      - goup-util build android .
+
+  windows:
+    desc: Build Windows .exe
+    deps: [templ]
+    cmds:
+      - goup-util build windows .
+
+  all:
+    desc: Build all platforms
+    deps: [templ]
+    cmds:
+      - task: macos
+      - task: ios
+      - task: android
+      - task: windows
+
+  # === Run ===
+
+  run-macos:
+    desc: Run macOS app
+    deps: [macos]
+    cmds:
+      - open .bin/*.app
+
+  run-web:
+    desc: Run web server
+    deps: [build]
+    cmds:
+      - .bin/{{.BINARY}}-web serve
+
+  ios-sim:
+    desc: Install and run on iOS simulator
+    deps: [ios]
+    cmds:
+      - xcrun simctl install booted .bin/*.app
+      - xcrun simctl launch booted com.github.plat_rclone
+
+  # === Release ===
+
+  release:
+    desc: Build release binaries for all platforms
+    deps: [templ]
+    cmds:
+      - mkdir -p .releases
+      - goup-util build macos . && cp -r .bin/*.app .releases/
+      - goup-util build windows . && cp .bin/*.exe .releases/
+      - task: build
+      - cp .bin/{{.BINARY}}-web .releases/{{.BINARY}}-web-linux-amd64
+      - task: build-full
+      - cp .bin/{{.BINARY}}-web-full .releases/{{.BINARY}}-web-full-linux-amd64
+
+  # === Utils ===
+
+  download:
+    desc: Download rclone binary
+    cmds:
+      - go run ./cmd/plat-rclone download .bin
+
+  datastar:
+    desc: Download Datastar JS bundles
+    cmds:
+      - mkdir -p static/js
+      - 'curl -sL "https://raw.githubusercontent.com/starfederation/datastar/{{.DATASTAR_VERSION}}/bundles/datastar.js" -o static/js/datastar.js'
+      - 'curl -sL "https://raw.githubusercontent.com/starfederation/datastar/{{.DATASTAR_VERSION}}/bundles/datastar.js.map" -o static/js/datastar.js.map'
+      - echo "Downloaded Datastar {{.DATASTAR_VERSION}}"
+
+  icons:
+    desc: Generate app icons from icon-source.png
+    cmds:
+      - goup-util icons .
+
+  screenshot:
+    desc: Take iOS simulator screenshot
+    cmds:
+      - xcrun simctl io booted screenshot docs/ios-screenshot.png
+      - echo "Saved docs/ios-screenshot.png"
+
+  # === Setup ===
+
+  tools:
+    desc: Install required Go tools
+    cmds:
+      - go install github.com/a-h/templ/cmd/templ@latest
+
+  install-goup:
+    desc: Install goup-util
+    cmds:
+      - 'curl -fsSL "https://github.com/joeblew999/goup-util/releases/download/{{.GOUP_VERSION}}/goup-util_$(uname -s)_$(uname -m).tar.gz" | tar -xz -C /usr/local/bin goup-util'
+      - goup-util --help | head -1
+
+  # === Quality ===
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test ./...
+
+  fmt:
+    desc: Format code
+    cmds:
+      - go fmt ./...
+      - templ fmt templates/
+
+  lint:
+    desc: Run linter
+    cmds:
+      - golangci-lint run ./...
+    ignore_error: true
+
+  clean:
+    desc: Remove build outputs
+    cmds:
+      - rm -rf .bin .build .releases
+      - echo "Cleaned"

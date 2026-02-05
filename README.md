@@ -4,25 +4,26 @@ Cross-platform GUI for [rclone](https://rclone.org) using Datastar + Gio.
 
 | Remotes | File Browser |
 |---------|--------------|
-| ![Remotes](docs/remotes-view.png) | ![Browser](docs/file-browser.png) |
+| ![Remotes](docs/embedded-remotes.png) | ![Browser](docs/embedded-browser.png) |
 
-| Jobs | Stats |
-|------|-------|
-| ![Jobs](docs/jobs-view.png) | ![Stats](docs/stats-view.png) |
-
-### iOS (iPhone 16 Pro)
-
-<img src="docs/ios-remotes.png" width="300" alt="iOS App">
+| Stats | iOS |
+|-------|-----|
+| ![Stats](docs/embedded-stats.png) | <img src="docs/ios-remotes.png" width="200"> |
 
 ## Features
 
 - **Cross-platform** - macOS, iOS, Android, Windows from single codebase
+- **Embedded rclone** - No external daemon needed (via librclone)
 - **Native webview** - Gio + webviewer for native performance
-- **Real-time UI** - Datastar SSE for instant updates (~11KB)
-- **Web server** - Headless mode for browsers
-- **rclone Integration** - Full RC API support
+- **Real-time UI** - Datastar SSE for instant updates
+- **CI/CD** - Full releases via xplat + goup-util
 
-### rclone Features
+### rclone Integration
+
+| Mode | Description |
+|------|-------------|
+| **Embedded** | rclone runs in-process via librclone (no daemon) |
+| **HTTP** | Connect to external `rclone rcd` daemon |
 
 | Feature | Status |
 |---------|--------|
@@ -33,134 +34,145 @@ Cross-platform GUI for [rclone](https://rclone.org) using Datastar + Gio.
 | Delete files | Yes |
 | Stop jobs | Yes |
 | Copy/Move | Planned |
-| Create remote | Planned |
 
 ## Quick Start
 
+### Using xplat (recommended)
+
 ```bash
+# Install xplat
+curl -fsSL https://raw.githubusercontent.com/joeblew999/xplat/main/install.sh | sh
+
+# Run with embedded rclone (no daemon needed!)
+xplat task dev-embedded
+
+# Open http://localhost:8080
+```
+
+### Using Make
+
+```bash
+# Embedded mode (no daemon needed)
+make dev-embedded
+
+# Or HTTP mode (needs external rclone)
 make download                      # Get rclone binary
-./.bin/rclone rcd --rc-no-auth     # Start rclone RC API (other terminal)
-make run-macos                     # Run native app
-# or
-make dev                           # Run web server (http://localhost:8080)
+./.bin/rclone rcd --rc-no-auth     # Start rclone (other terminal)
+make dev                           # Run web server
 ```
 
-## goup-util Integration
+## Build Options
 
-This project uses [goup-util v2.0.0](https://github.com/joeblew999/goup-util/releases/tag/v2.0.0) for cross-platform builds with zero configuration.
+### Embedded rclone (librclone)
 
-### Build Commands
+plat-rclone can embed rclone directly - no external daemon required.
+
+| Build | Command | Binary Size | Backends |
+|-------|---------|-------------|----------|
+| Light | `make dev-embedded` | ~30MB | Local only |
+| Full | `make dev-embedded-full` | ~100MB | All (S3, GDrive, etc.) |
 
 ```bash
-make all        # Build all platforms
-make macos      # macOS .app bundle     -> .bin/plat-rclone.app
-make ios        # iOS .app              -> .bin/plat-rclone.app
-make android    # Android .apk          -> .bin/plat-rclone.apk
-make windows    # Windows .exe          -> .bin/plat-rclone.exe
+# Light build (local backend only - good for mobile)
+go build ./cmd/plat-rclone
+
+# Full build (all backends)
+go build -tags=rclone_full ./cmd/plat-rclone
 ```
 
-### goup-util Features Used
-
-| Feature | Command | Description |
-|---------|---------|-------------|
-| Cross-compilation | `goup-util build <platform> .` | Single command builds for any platform |
-| Icon generation | `make icons` | Generate all app icons from `icon-source.png` |
-| SDK management | `goup-util sdk` | Download iOS/Android SDKs automatically |
-| App bundling | Automatic | Creates proper .app/.apk bundles |
-
-### Platform Requirements
-
-| Platform | Requirements |
-|----------|--------------|
-| macOS | Xcode Command Line Tools |
-| iOS | Xcode with iOS SDK |
-| Android | Android NDK (auto-downloaded by goup-util) |
-| Windows | MinGW or cross-compiler |
-
-## Run Modes
+### Native Apps (via goup-util)
 
 ```bash
-# Native app (Gio + WebView)
-make run-macos    # Run macOS app
-make ios-sim      # Install to iOS simulator
-
-# Web server (headless)
-make run-web      # http://localhost:8080
-make dev          # Dev mode with hot reload
+xplat task macos      # macOS .app bundle
+xplat task ios        # iOS .app
+xplat task android    # Android .apk
+xplat task windows    # Windows .exe
+xplat task all        # All platforms
 ```
+
+## CI/CD
+
+Releases are automated via GitHub Actions using [xplat](https://github.com/joeblew999/xplat).
+
+```bash
+# Create a release
+git tag v1.0.0
+git push origin v1.0.0
+# GitHub Actions builds all platforms automatically
+```
+
+### Release Artifacts
+
+| Platform | Artifacts |
+|----------|-----------|
+| macOS | `.app` bundle, web server binary |
+| Windows | `.exe` native app, web server binary |
+| Linux | Web server binary |
+| iOS | `.app` (build locally with Xcode) |
+| Android | `.apk` (build locally) |
 
 ## Architecture
 
 ```
 plat-rclone/
-├── main.go              # Gio + webviewer native app
-├── cmd/plat-rclone/     # Web server CLI (headless mode)
+├── cmd/plat-rclone/     # CLI (web server + embedded rclone)
 ├── pkg/
-│   ├── datastar/        # SSE helpers for Datastar
-│   ├── rclone/          # rclone RC API client
-│   └── router/          # Chi router + Datastar integration
+│   ├── rclone/          # rclone client (HTTP + embedded backends)
+│   │   ├── backend.go           # Backend interface
+│   │   ├── backend_http.go      # HTTP backend (remote rclone)
+│   │   ├── backend_embedded.go  # Embedded backend (librclone)
+│   │   ├── backend_imports.go   # Local backend only (default)
+│   │   └── backend_imports_full.go  # All backends (-tags=rclone_full)
+│   ├── datastar/        # SSE helpers
+│   └── router/          # Chi router + Datastar
 ├── templates/           # templ HTML templates
-│   ├── layout.templ     # Base layout
-│   ├── remotes.templ    # Remotes & file browser
-│   ├── jobs.templ       # Job monitoring
-│   └── stats.templ      # Transfer statistics
-├── static/
-│   ├── css/style.css    # Dark theme styling
-│   └── js/              # Datastar bundles (embedded)
-├── icon-source.png      # 1024x1024 app icon source
-├── Makefile             # Build automation
-├── .bin/                # Build output (gitignored)
-└── .build/              # Intermediate files (gitignored)
+├── static/              # CSS + JS (Datastar)
+├── main.go              # Gio native app (webview)
+├── Taskfile.yml         # xplat tasks
+├── Makefile             # Make targets (alias to tasks)
+├── xplat.yaml           # xplat manifest
+└── .github/workflows/   # CI/CD
 ```
 
-## Datastar Versions
+## Development
 
-The Go SDK and JS library must be compatible:
+### With xplat
 
-| Go SDK (datastar-go) | JS Library | Status |
-|---------------------|------------|--------|
-| v1.1.0 | v1.0.0-RC.7 | Current |
-
-Update JS library:
 ```bash
-make datastar    # Downloads all bundles to static/js/
+xplat task dev              # HTTP mode (needs rclone rcd)
+xplat task dev-embedded     # Embedded mode (local backend)
+xplat task dev-embedded-full # Embedded mode (all backends)
+xplat task test             # Run tests
+xplat task fmt              # Format code
 ```
 
-Available bundles:
-- `datastar.js` - Full bundle (30KB)
-- `datastar-core.js` - Core only (9KB)
-- `datastar-aliased.js` - Aliased exports
-
-## AI Debugging
-
-Since plat-rclone uses standard web technologies, AI tools can debug the UI using browser automation:
+### With Make
 
 ```bash
-make dev    # Start dev server
-
-# AI can use Playwright MCP to:
-# - Take DOM snapshots
-# - Click buttons and test interactions
-# - Inspect SSE streams
-# - Verify Datastar reactivity
+make help                   # Show all targets
+make dev-embedded           # Embedded mode
+make test                   # Run tests
 ```
 
 ## Requirements
 
 - Go 1.24+
-- [goup-util](https://github.com/joeblew999/goup-util) - Cross-platform build tool
-- [templ](https://github.com/a-h/templ) - Type-safe HTML templates
+- [xplat](https://github.com/joeblew999/xplat) - Build orchestration
+- [goup-util](https://github.com/joeblew999/goup-util) - Cross-platform builds
+- [templ](https://github.com/a-h/templ) - HTML templates
 
-Install tools:
 ```bash
-make tools    # Install templ
-# goup-util: see https://github.com/joeblew999/goup-util
+# Install all tools
+curl -fsSL https://raw.githubusercontent.com/joeblew999/xplat/main/install.sh | sh
+xplat task tools
+xplat task install-goup
 ```
 
 ## References
 
-- [goup-util](https://github.com/joeblew999/goup-util) - Cross-platform Gio build tool
-- [rclone RC API](https://rclone.org/rc/) - Remote control API
+- [xplat](https://github.com/joeblew999/xplat) - Cross-platform CI/CD
+- [goup-util](https://github.com/joeblew999/goup-util) - Gio build tool
+- [rclone](https://rclone.org) / [librclone](https://rclone.org/rc/#using-rclone-as-a-library) - Cloud sync
 - [Datastar](https://data-star.dev/) - Hypermedia framework
 - [Gio](https://gioui.org/) - Go UI framework
 - [templ](https://templ.guide/) - Go HTML templates

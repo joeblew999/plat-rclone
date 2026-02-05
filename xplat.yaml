@@ -1,0 +1,39 @@
+# xplat.yaml - Package manifest for plat-rclone
+apiVersion: xplat/v1
+kind: Package
+
+name: plat-rclone
+version: main
+description: Cross-platform GUI for rclone using Datastar + Gio
+author: joeblew999
+license: MIT
+
+# Binary configuration
+binary:
+  name: plat-rclone
+  source:
+    go: github.com/joeblew999/plat-rclone
+
+# Taskfile for build automation
+taskfile:
+  path: Taskfile.yml
+  namespace: plat-rclone
+
+# Development processes
+processes:
+  dev:
+    command: xplat task dev
+    port: 8080
+  dev-embedded:
+    command: xplat task dev-embedded
+    port: 8080
+
+# Environment variables
+env:
+  optional:
+    - name: RCLONE_URL
+      description: rclone RC API URL (default http://localhost:5572)
+    - name: RCLONE_USER
+      description: rclone RC username
+    - name: RCLONE_PASS
+      description: rclone RC password
