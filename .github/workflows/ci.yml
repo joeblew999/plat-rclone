@@ -62,11 +62,22 @@ jobs:
       - name: Build release
         run: xplat task release:${{ matrix.platform }}
 
+      - name: Verify artifacts exist
+        shell: bash
+        run: |
+          echo "Working directory: $(pwd)"
+          echo "GitHub workspace: ${{ github.workspace }}"
+          echo "Contents of .dist/:"
+          ls -la .dist/ || echo ".dist/ not found"
+          echo "Absolute path check:"
+          ls -la ${{ github.workspace }}/.dist/ || echo "Workspace .dist/ not found"
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: plat-rclone-${{ matrix.platform }}
-          path: .dist/
+          path: ${{ github.workspace }}/.dist/*
+          if-no-files-found: error
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
