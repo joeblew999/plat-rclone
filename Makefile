@@ -1,10 +1,11 @@
-.PHONY: all clean templ macos ios android windows web run-macos ios-sim run-web dev download datastar icons tools test fmt help screenshot
+.PHONY: all clean templ macos ios android windows web run-macos ios-sim run-web dev download datastar icons tools test fmt help screenshot install-goup
 
 # Datastar JS version (must match Go SDK)
 DATASTAR_VERSION := v1.0.0-RC.7
 
 # goup-util for cross-platform builds
 GOUP := goup-util
+GOUP_VERSION := v2.0.0
 
 # Build all platforms
 all: templ macos ios android windows web
@@ -81,6 +82,12 @@ clean:  # Remove build outputs
 tools:  # Install required Go tools
 	@go install github.com/a-h/templ/cmd/templ@latest
 
+install-goup:  # Install goup-util $(GOUP_VERSION) for cross-platform builds
+	@echo "Installing goup-util $(GOUP_VERSION)..."
+	@curl -fsSL "https://github.com/joeblew999/goup-util/releases/download/$(GOUP_VERSION)/goup-util_$(shell uname -s)_$(shell uname -m).tar.gz" | tar -xz -C /usr/local/bin goup-util
+	@echo "Installed goup-util $(GOUP_VERSION) to /usr/local/bin"
+	@goup-util --help | head -1
+
 test:  # Run all tests
 	@go test ./...
 
@@ -102,8 +109,8 @@ help:  # Show this help
 	@echo "  make web       Web server"
 	@echo ""
 	@echo "Utils:                              Setup:"
-	@echo "  make download  Get rclone binary    make tools      Install templ"
-	@echo "  make datastar  Update Datastar JS   make icons      Generate icons"
-	@echo "  make clean     Remove build files"
+	@echo "  make download  Get rclone binary    make install-goup  Install goup-util"
+	@echo "  make datastar  Update Datastar JS   make tools         Install templ"
+	@echo "  make icons     Generate app icons   make clean         Remove build files"
 	@echo ""
-	@echo "Datastar: Go SDK v1.1.0 requires JS v$(DATASTAR_VERSION)"
+	@echo "Versions: goup-util $(GOUP_VERSION) | Datastar JS $(DATASTAR_VERSION)"
