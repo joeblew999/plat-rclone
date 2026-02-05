@@ -115,16 +115,49 @@ tasks:
   # === Release ===
 
   release:
-    desc: Build release binaries for all platforms
+    desc: Build release for current platform
     deps: [templ]
     cmds:
-      - mkdir -p .releases
-      - goup-util build macos . && cp -r .bin/*.app .releases/
-      - goup-util build windows . && cp .bin/*.exe .releases/
+      - xplat os mkdir -p .dist
       - task: build
-      - cp .bin/{{.BINARY}}-web .releases/{{.BINARY}}-web-linux-amd64
       - task: build-full
-      - cp .bin/{{.BINARY}}-web-full .releases/{{.BINARY}}-web-full-linux-amd64
+      - task: release:package
+
+  release:package:
+    desc: Package builds for release
+    internal: true
+    cmds:
+      - goup-util package {{OS}} .
+
+  release:macos:
+    desc: Build macOS release (app bundle + web binaries)
+    deps: [templ]
+    cmds:
+      - xplat os mkdir -p .dist
+      - task: macos
+      - task: build
+      - task: build-full
+      - goup-util package macos .
+
+  release:linux:
+    desc: Build Linux release (web binaries)
+    deps: [templ]
+    cmds:
+      - xplat os mkdir -p .dist
+      - task: build
+      - task: build-full
+      - goup-util package linux .
+
+  release:windows:
+    desc: Build Windows release (web binaries)
+    deps: [templ]
+    vars:
+      EXT: .exe
+    cmds:
+      - xplat os mkdir -p .dist
+      - go build -o .bin/{{.BINARY}}-web{{.EXT}} ./cmd/plat-rclone
+      - go build -tags=rclone_full -o .bin/{{.BINARY}}-web-full{{.EXT}} ./cmd/plat-rclone
+      - goup-util package windows .
 
   # === Utils ===
 
