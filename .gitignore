@@ -2,6 +2,9 @@
 .bin/
 .build/
 
+# Playwright MCP logs
+.playwright-mcp/
+
 # Go
 *.test
 *.out

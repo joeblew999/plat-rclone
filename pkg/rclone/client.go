@@ -1,80 +1,71 @@
 // Package rclone provides a client for the rclone RC API.
+// It supports both embedded librclone and remote HTTP backends.
 package rclone
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"time"
 )
 
-// Client is an rclone RC API client.
+// Client wraps a Backend with all the rclone business logic.
+// The same methods work whether using embedded librclone or HTTP remote.
 type Client struct {
-	BaseURL    string
-	HTTPClient *http.Client
-	Username   string
-	Password   string
+	backend Backend
 }
 
-// NewClient creates a new rclone RC client.
+// NewClient creates a new rclone client using HTTP to connect to a remote rclone instance.
+// This is the traditional approach - connect to rclone running with `rclone rcd`.
 func NewClient(baseURL string) *Client {
-	return &Client{
-		BaseURL: baseURL,
-		HTTPClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-	}
+	return &Client{backend: NewHTTPBackend(baseURL)}
 }
 
-// WithAuth sets basic auth credentials.
+// NewClientWithAuth creates a new HTTP client with basic auth.
+func NewClientWithAuth(baseURL, username, password string) *Client {
+	return &Client{backend: NewHTTPBackend(baseURL).WithAuth(username, password)}
+}
+
+// NewEmbedded creates a new rclone client using embedded librclone.
+// No external rclone daemon needed - rclone runs in-process.
+func NewEmbedded() *Client {
+	return &Client{backend: NewEmbeddedBackend()}
+}
+
+// WithAuth sets basic auth credentials (only works with HTTP backend).
 func (c *Client) WithAuth(username, password string) *Client {
-	c.Username = username
-	c.Password = password
+	if h, ok := c.backend.(*HTTPBackend); ok {
+		h.WithAuth(username, password)
+	}
 	return c
 }
 
-// Call makes an RC API call.
-func (c *Client) Call(method string, params any) (json.RawMessage, error) {
-	url := c.BaseURL + "/" + method
-
-	// rclone RC API always expects JSON, even if empty
-	if params == nil {
-		params = map[string]any{}
+// Close releases resources. Should be called when using embedded backend.
+func (c *Client) Close() {
+	if e, ok := c.backend.(*EmbeddedBackend); ok {
+		e.Close()
 	}
-	data, err := json.Marshal(params)
-	if err != nil {
-		return nil, fmt.Errorf("marshal params: %w", err)
-	}
-	body := bytes.NewReader(data)
+}
 
-	req, err := http.NewRequest("POST", url, body)
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	if c.Username != "" {
-		req.SetBasicAuth(c.Username, c.Password)
+// call makes an RC API call and returns the JSON response.
+func (c *Client) call(method string, params any) (json.RawMessage, error) {
+	// Encode params to JSON
+	var paramsJSON string
+	if params != nil {
+		data, err := json.Marshal(params)
+		if err != nil {
+			return nil, fmt.Errorf("marshal params: %w", err)
+		}
+		paramsJSON = string(data)
 	}
 
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
-	}
-	defer resp.Body.Close()
+	// Make the call via backend
+	resp, status := c.backend.Call(method, paramsJSON)
 
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
+	// Check for errors
+	if status != 200 {
+		return nil, fmt.Errorf("rc error %d: %s", status, resp)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("rc error %d: %s", resp.StatusCode, string(respBody))
-	}
-
-	return respBody, nil
+	return json.RawMessage(resp), nil
 }
 
 // --- Config Operations ---
@@ -88,7 +79,7 @@ type Remote struct {
 
 // ListRemotes returns all configured remotes.
 func (c *Client) ListRemotes() ([]string, error) {
-	resp, err := c.Call("config/listremotes", nil)
+	resp, err := c.call("config/listremotes", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +95,7 @@ func (c *Client) ListRemotes() ([]string, error) {
 
 // GetRemote returns configuration for a specific remote.
 func (c *Client) GetRemote(name string) (map[string]string, error) {
-	resp, err := c.Call("config/get", map[string]string{"name": name})
+	resp, err := c.call("config/get", map[string]string{"name": name})
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +109,7 @@ func (c *Client) GetRemote(name string) (map[string]string, error) {
 
 // DeleteRemote deletes a remote configuration.
 func (c *Client) DeleteRemote(name string) error {
-	_, err := c.Call("config/delete", map[string]string{"name": name})
+	_, err := c.call("config/delete", map[string]string{"name": name})
 	return err
 }
 
@@ -140,7 +131,7 @@ func (c *Client) List(remote, path string) ([]ListItem, error) {
 		fs += path
 	}
 
-	resp, err := c.Call("operations/list", map[string]any{
+	resp, err := c.call("operations/list", map[string]any{
 		"fs":     fs,
 		"remote": "",
 	})
@@ -159,7 +150,7 @@ func (c *Client) List(remote, path string) ([]ListItem, error) {
 
 // Mkdir creates a directory.
 func (c *Client) Mkdir(remote, path string) error {
-	_, err := c.Call("operations/mkdir", map[string]string{
+	_, err := c.call("operations/mkdir", map[string]string{
 		"fs":     remote + ":",
 		"remote": path,
 	})
@@ -168,7 +159,7 @@ func (c *Client) Mkdir(remote, path string) error {
 
 // Delete deletes a file.
 func (c *Client) Delete(remote, path string) error {
-	_, err := c.Call("operations/deletefile", map[string]string{
+	_, err := c.call("operations/deletefile", map[string]string{
 		"fs":     remote + ":",
 		"remote": path,
 	})
@@ -177,7 +168,7 @@ func (c *Client) Delete(remote, path string) error {
 
 // Purge deletes a directory and all contents.
 func (c *Client) Purge(remote, path string) error {
-	_, err := c.Call("operations/purge", map[string]string{
+	_, err := c.call("operations/purge", map[string]string{
 		"fs":     remote + ":",
 		"remote": path,
 	})
@@ -188,7 +179,7 @@ func (c *Client) Purge(remote, path string) error {
 
 // Version returns rclone version info.
 func (c *Client) Version() (map[string]any, error) {
-	resp, err := c.Call("core/version", nil)
+	resp, err := c.call("core/version", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +193,7 @@ func (c *Client) Version() (map[string]any, error) {
 
 // Stats returns current transfer statistics.
 func (c *Client) Stats() (map[string]any, error) {
-	resp, err := c.Call("core/stats", nil)
+	resp, err := c.call("core/stats", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +209,7 @@ func (c *Client) Stats() (map[string]any, error) {
 
 // Copy copies files from source to destination.
 func (c *Client) Copy(srcRemote, srcPath, dstRemote, dstPath string) error {
-	_, err := c.Call("sync/copy", map[string]string{
+	_, err := c.call("sync/copy", map[string]string{
 		"srcFs": srcRemote + ":" + srcPath,
 		"dstFs": dstRemote + ":" + dstPath,
 	})
@@ -227,7 +218,7 @@ func (c *Client) Copy(srcRemote, srcPath, dstRemote, dstPath string) error {
 
 // Move moves files from source to destination.
 func (c *Client) Move(srcRemote, srcPath, dstRemote, dstPath string) error {
-	_, err := c.Call("sync/move", map[string]string{
+	_, err := c.call("sync/move", map[string]string{
 		"srcFs": srcRemote + ":" + srcPath,
 		"dstFs": dstRemote + ":" + dstPath,
 	})
@@ -249,7 +240,7 @@ type Job struct {
 
 // ListJobs returns all current jobs.
 func (c *Client) ListJobs() ([]Job, error) {
-	resp, err := c.Call("job/list", nil)
+	resp, err := c.call("job/list", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +265,7 @@ func (c *Client) ListJobs() ([]Job, error) {
 
 // GetJob returns details of a specific job.
 func (c *Client) GetJob(id int64) (*Job, error) {
-	resp, err := c.Call("job/status", map[string]int64{"jobid": id})
+	resp, err := c.call("job/status", map[string]int64{"jobid": id})
 	if err != nil {
 		return nil, err
 	}
@@ -289,6 +280,6 @@ func (c *Client) GetJob(id int64) (*Job, error) {
 
 // StopJob stops a running job.
 func (c *Client) StopJob(id int64) error {
-	_, err := c.Call("job/stop", map[string]int64{"jobid": id})
+	_, err := c.call("job/stop", map[string]int64{"jobid": id})
 	return err
 }

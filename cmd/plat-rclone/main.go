@@ -17,6 +17,7 @@ var (
 	rcloneURL  = "http://localhost:5572"
 	rcloneUser = ""
 	rclonePass = ""
+	embedded   = false
 )
 
 func main() {
@@ -56,12 +57,14 @@ Options for serve:
   -rclone    rclone RC API URL (default "http://localhost:5572")
   -user      rclone RC username
   -pass      rclone RC password
+  -embedded  Use embedded rclone (no external daemon needed)
 
 Examples:
-  plat-rclone                    # Start web server on :8080
-  plat-rclone serve -addr :3000  # Start on custom port
-  plat-rclone download           # Download rclone to current directory
-  plat-rclone download ./bin     # Download to ./bin directory`)
+  plat-rclone                      # Start web server on :8080
+  plat-rclone serve -addr :3000    # Start on custom port
+  plat-rclone serve -embedded      # Use embedded rclone (no rclone daemon)
+  plat-rclone download             # Download rclone to current directory
+  plat-rclone download ./bin       # Download to ./bin directory`)
 }
 
 func parseFlags() {
@@ -91,6 +94,8 @@ func parseFlags() {
 				rclonePass = args[i+1]
 				i++
 			}
+		case "-embedded":
+			embedded = true
 		}
 	}
 }
@@ -157,9 +162,16 @@ func fileExists(path string) bool {
 
 func cmdServe() {
 	// Create rclone client
-	rc := rclone.NewClient(rcloneURL)
-	if rcloneUser != "" {
-		rc.WithAuth(rcloneUser, rclonePass)
+	var rc *rclone.Client
+	if embedded {
+		rc = rclone.NewEmbedded()
+		defer rc.Close()
+		fmt.Println("Using embedded rclone (librclone)")
+	} else {
+		rc = rclone.NewClient(rcloneURL)
+		if rcloneUser != "" {
+			rc.WithAuth(rcloneUser, rclonePass)
+		}
 	}
 
 	// Create router
