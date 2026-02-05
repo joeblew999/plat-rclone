@@ -1,19 +1,14 @@
-//go:build !rclone_full
-
 package rclone
 
 import (
 	"sync"
 
-	// Import local backend and operations for lightweight builds
-	_ "github.com/rclone/rclone/backend/local"
-	_ "github.com/rclone/rclone/fs/operations" // Registers operations/list, etc.
 	"github.com/rclone/rclone/librclone/librclone"
 )
 
 // EmbeddedBackend implements Backend using librclone for embedded rclone.
-// This lightweight version only includes the local backend.
-// Build with -tags=rclone_full for all backends.
+// Build with -tags=rclone_full for all backends (S3, GDrive, etc).
+// Default build includes only local backend (smaller binary).
 type EmbeddedBackend struct {
 	initOnce sync.Once
 }
